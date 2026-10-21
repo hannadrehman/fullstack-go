@@ -1,41 +1,30 @@
+# App stack (server + client). Postgres is NOT here: it is shared by all worktrees
+# via docker-compose.db.yml (container `scraps-db`, network `scraps-shared`).
+# Host ports come from SERVER_PORT / CLIENT_PORT so each worktree can use its own.
 services:
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: scraps
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   server:
     build:
       context: .
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgres://postgres:postgres@db:5432/scraps?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@scraps-db:5432/scraps?sslmode=disable
       ADDR: ":8080"
     ports:
-      - "8080:8080"
-    depends_on:
-      db:
-        condition: service_healthy
+      - "${SERVER_PORT:-8080}:8080"
+    networks:
+      - default
+      - shared
 
   client:
     build:
       context: .
       dockerfile: client/Dockerfile
     ports:
-      - "3000:80"
+      - "${CLIENT_PORT:-3000}:80"
     depends_on:
       - server
 
-volumes:
-  pgdata:
+networks:
+  shared:
+    name: scraps-shared
+    external: true

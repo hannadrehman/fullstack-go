@@ -1,0 +1,32 @@
+# Shared Postgres, one instance for ALL worktrees (fixed project, container, port, network).
+# Start (idempotent): docker compose -f docker-compose.db.yml up -d --wait
+name: scraps-shared-db
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: scraps-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: scraps
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - shared
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+networks:
+  shared:
+    name: scraps-shared
+
+volumes:
+  pgdata:
+    name: scraps-shared-pgdata
