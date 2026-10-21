@@ -86,3 +86,20 @@ Never commit the compiled `server` binary (already in `.gitignore`).
 3. Full stack verified with `docker compose up --build -d` and a couple of live API calls
    (health, register user, post scrap, reply).
 4. Commit and push only when the user asks.
+## Multiple worktrees / port handling
+
+Several worktrees may run this stack at once. **Use `scripts/dev-up.sh` instead of raw
+`docker compose up`** when asked to run the project:
+
+- `scripts/dev-up.sh` (or `up`) — derives a per-worktree compose project name
+  (`scraps-<dir>`), so containers and the `pgdata` volume are isolated per worktree.
+  It picks free host ports (prefers 3000/8080/5432, otherwise random), saves them to
+  `.env` (gitignored), reuses them on restart, starts the stack, and prints the URLs.
+  It also lists the project running from other worktrees.
+- `scripts/dev-up.sh status` / `down` (`down -v` wipes this worktree's DB).
+- Compose host ports come from `CLIENT_PORT`, `SERVER_PORT`, `DB_PORT` (defaults
+  3000/8080/5432). Container-internal ports never change, so nginx's `server:8080`
+  proxy is unaffected.
+- Each worktree has its own fresh DB; `migrate()` applies the full schema on server
+  startup. Existing DBs still need manual `ALTER TABLE` (see Migrations).
+- When reporting to the user, always use the ports printed by the script, not 3000/8080.

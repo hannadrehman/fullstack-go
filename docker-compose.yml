@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: scraps
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -23,7 +23,7 @@ services:
       DATABASE_URL: postgres://postgres:postgres@db:5432/scraps?sslmode=disable
       ADDR: ":8080"
     ports:
-      - "8080:8080"
+      - "${SERVER_PORT:-8080}:8080"
     depends_on:
       db:
         condition: service_healthy
@@ -33,7 +33,7 @@ services:
       context: .
       dockerfile: client/Dockerfile
     ports:
-      - "3000:80"
+      - "${CLIENT_PORT:-3000}:80"
     depends_on:
       - server
 
