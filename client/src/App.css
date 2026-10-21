@@ -1,0 +1,187 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f0e8d8;
+  color: #3b3022;
+}
+
+.app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 2.2rem;
+}
+
+main {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  main {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background: #fffdf5;
+  border: 1px solid #d8c9a8;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.card h2 {
+  margin-top: 0;
+  font-size: 1.1rem;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #c9b894;
+  border-radius: 6px;
+  font: inherit;
+  background: #fff;
+  margin-bottom: 8px;
+}
+
+textarea {
+  resize: vertical;
+}
+
+button {
+  background: #d94f2b;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #c24322;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+button.link {
+  background: none;
+  color: #a05a1a;
+  padding: 4px 0;
+  font-size: 0.85rem;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+.row select {
+  margin-bottom: 0;
+}
+
+.error {
+  color: #b3261e;
+  font-size: 0.85rem;
+  margin: 4px 0;
+}
+
+.muted {
+  color: #8a7a5f;
+}
+
+.feed {
+  min-height: 400px;
+}
+
+.scrap-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e8b04a;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.avatar.small {
+  width: 24px;
+  height: 24px;
+  font-size: 0.8rem;
+}
+
+.time {
+  display: block;
+  font-size: 0.75rem;
+  color: #8a7a5f;
+}
+
+.scrap-content {
+  margin: 10px 0;
+  white-space: pre-wrap;
+}
+
+.replies {
+  margin-top: 10px;
+  border-top: 1px dashed #d8c9a8;
+  padding-top: 10px;
+}
+
+.reply {
+  margin-bottom: 10px;
+}
+
+.reply p {
+  margin: 2px 0 0;
+}
+
+.reply-form {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.members {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.members li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
