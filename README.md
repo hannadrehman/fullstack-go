@@ -1,6 +1,16 @@
 # fullstack-go
 
-An Orkut-style scrapbook portal. Register users, post scraps, and reply to anyone's scrap — no authentication, all APIs are public.
+An Orkut-style scrapbook portal for sharing short messages and conversations in a shared feed. A “scrap” is a text post that other members can reply to, bringing the feel of a classic social scrapbook to a simple web app.
+
+The project combines a Go HTTP API, a React interface, and PostgreSQL storage. Docker Compose runs all three services together, while the frontend and backend can also be run separately for local development. There is no authentication: registration creates a member profile, and anyone can select an existing member when posting or replying. All APIs are intentionally public.
+
+## Features
+
+- **Member profiles:** Register with a name, email address, and optional avatar emoji, and browse the member list.
+- **Shared scrapbook feed:** Post text scraps and view the latest posts with author names, relative timestamps, and reply counts.
+- **Conversations:** Expand a scrap to read its replies and add a response as any registered member.
+- **Persistent storage:** Store members, scraps, and replies in PostgreSQL; the Compose setup keeps database data in a named volume.
+- **Public JSON API:** Create and retrieve members, scraps, and replies through the same API used by the frontend.
 
 ## Stack
 
@@ -43,6 +53,15 @@ To stop:
 docker compose down        # keep data
 docker compose down -v     # also wipe the database
 ```
+
+## Using the app
+
+1. Open http://localhost:3000 after starting the stack.
+2. Use **Register** to create a member with a name, email address, and optional avatar emoji.
+3. Write a message under **Post a scrap**, choose the member who is posting, and select **Post scrap**.
+4. Select a scrap’s reply count to expand the conversation. Enter a response, choose a member, and select **Reply**.
+
+The member selectors let you try conversations between multiple profiles without signing in or switching accounts.
 
 ## Local development (without Docker)
 
