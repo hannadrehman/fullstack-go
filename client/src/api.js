@@ -1,15 +1,17 @@
-const BASE = import.meta.env.VITE_API_URL || '/api'
+const BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/+$/, '')
 
 async function req(path, options = {}) {
+  const headers = new Headers(options.headers)
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers,
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
     throw new Error(body.error || `Request failed (${res.status})`)
   }
-  return res.json()
+  return res.status === 204 ? null : res.json()
 }
 
 export const api = {

@@ -1,16 +1,33 @@
-# React + Vite
+# Scrapbook frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React and Vite frontend for the public scrapbook portal. All commands below run
+from the repository root. See the root README for the shared database and API setup,
+including selecting free ports for this worktree.
 
-Currently, two official plugins are available:
+## Development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Requires Node.js 22.12 or newer and npm. Set `SERVER_PORT` and `CLIENT_PORT` to the
+free ports chosen for your API and frontend, then run:
 
-## React Compiler
+```bash
+npm ci --prefix client
+API_URL="http://localhost:$SERVER_PORT" npm run dev --prefix client -- --port "$CLIENT_PORT" --strictPort
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Open `http://localhost:<CLIENT_PORT>` using your selected frontend port.
+Vite proxies relative `/api` requests to `API_URL` (default
+`http://localhost:8080`). Keep requests in `client/src/api.js`; do not hardcode
+API hosts in UI components. `client/src/App.jsx` contains the UI.
 
-## Expanding the Oxlint configuration
+## Build and lint
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+```bash
+npm run build --prefix client
+npm run lint --prefix client
+```
+
+The production build is written to `client/dist/`. The frontend Docker image
+serves this build with nginx, which proxies `/api/` to `server:8080` on the Compose
+network. `API_URL` configures the Vite development proxy only.
+
+Keep `color-scheme: light` in `client/src/index.css` so form text remains visible.

@@ -40,12 +40,14 @@ function RegisterForm({ onRegistered }) {
     <form className="card register-form" onSubmit={submit}>
       <h2>Register</h2>
       <input
+        aria-label="Name"
         placeholder="Name"
         value={name}
         onChange={(e) => setName(e.target.value)}
         required
       />
       <input
+        aria-label="Email"
         type="email"
         placeholder="Email"
         value={email}
@@ -53,6 +55,7 @@ function RegisterForm({ onRegistered }) {
         required
       />
       <input
+        aria-label="Avatar emoji (optional)"
         placeholder="Avatar emoji (optional)"
         maxLength={4}
         value={avatar}
@@ -97,6 +100,7 @@ function ScrapForm({ users, currentUser, onPosted }) {
     <form className="card scrap-form" onSubmit={submit}>
       <h2>Post a scrap</h2>
       <textarea
+        aria-label="Scrap content"
         placeholder="Write something for everyone…"
         rows={3}
         value={content}
@@ -104,7 +108,7 @@ function ScrapForm({ users, currentUser, onPosted }) {
         required
       />
       <div className="row">
-        <select value={userId} onChange={(e) => setUserId(e.target.value)}>
+        <select aria-label="Posting as" value={userId} onChange={(e) => setUserId(e.target.value)}>
           <option value="">— posting as —</option>
           {users.map((u) => (
             <option key={u.id} value={u.id}>
@@ -124,32 +128,38 @@ function ReplyForm({ scrapId, users, onReplied }) {
   const [content, setContent] = useState('')
   const [userId, setUserId] = useState('')
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
 
   async function submit(e) {
     e.preventDefault()
+    if (busy) return
     if (!userId) {
       setError('Pick who is replying.')
       return
     }
+    setBusy(true)
     setError('')
     try {
       await api.createReply(scrapId, { user_id: Number(userId), content })
       setContent('')
-      onReplied()
+      await onReplied()
     } catch (err) {
       setError(err.message)
+    } finally {
+      setBusy(false)
     }
   }
 
   return (
     <form className="reply-form" onSubmit={submit}>
       <input
+        aria-label="Reply content"
         placeholder="Write a reply…"
         value={content}
         onChange={(e) => setContent(e.target.value)}
         required
       />
-      <select value={userId} onChange={(e) => setUserId(e.target.value)}>
+      <select aria-label="Replying as" value={userId} onChange={(e) => setUserId(e.target.value)}>
         <option value="">— as —</option>
         {users.map((u) => (
           <option key={u.id} value={u.id}>
@@ -157,7 +167,7 @@ function ReplyForm({ scrapId, users, onReplied }) {
           </option>
         ))}
       </select>
-      <button>Reply</button>
+      <button disabled={busy}>{busy ? 'Replying…' : 'Reply'}</button>
       {error && <p className="error">{error}</p>}
     </form>
   )
@@ -217,16 +227,24 @@ export default function App() {
   const [scraps, setScraps] = useState([])
   const [currentUser, setCurrentUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   async function refresh() {
-    const [u, s] = await Promise.all([api.listUsers(), api.listScraps()])
-    setUsers(u || [])
-    setScraps(s || [])
-    setLoading(false)
+    setLoading(true)
+    setError('')
+    try {
+      const [u, s] = await Promise.all([api.listUsers(), api.listScraps()])
+      setUsers(u || [])
+      setScraps(s || [])
+    } catch (err) {
+      setError(`Could not refresh the feed: ${err.message}`)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    refresh().catch(() => setLoading(false))
+    refresh()
   }, [])
 
   return (
@@ -264,8 +282,14 @@ export default function App() {
 
         <section className="feed">
           <ScrapForm users={users} currentUser={currentUser} onPosted={refresh} />
+          {error && (
+            <div role="alert">
+              <p className="error">{error}</p>
+              <button onClick={refresh} disabled={loading}>Retry</button>
+            </div>
+          )}
           {loading && <p className="muted">Loading scraps…</p>}
-          {!loading && scraps.length === 0 && (
+          {!loading && !error && scraps.length === 0 && (
             <p className="muted">No scraps yet. Post the first one!</p>
           )}
           {scraps.map((s) => (

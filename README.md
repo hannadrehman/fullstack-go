@@ -20,7 +20,8 @@ An Orkut-style scrapbook portal. Register members, post scraps, and reply to any
 │   ├── Dockerfile     # build → nginx serve
 │   └── nginx.conf     # proxies /api → server:8080
 ├── Dockerfile         # Go server multi-stage build
-├── docker-compose.yml # db + server + client
+├── docker-compose.yml # per-worktree server + client
+├── docker-compose.db.yml # shared Postgres
 ├── go.mod / go.sum
 └── AGENTS.md          # instructions for AI coding agents
 ```
@@ -29,13 +30,26 @@ An Orkut-style scrapbook portal. Register members, post scraps, and reply to any
 
 Requires Docker Desktop (or docker engine + compose plugin).
 
+Run these commands in Bash from the repository root:
+
 ```bash
+# Shared by all worktrees; start this before the app network is needed.
+docker compose -f docker-compose.db.yml up -d --wait
+
+free_port() { while :; do p=$((20000 + RANDOM % 20000)); (exec 3<>/dev/tcp/127.0.0.1/$p) 2>/dev/null || { echo "$p"; return; }; done; }
+export SERVER_PORT=$(free_port)
+export CLIENT_PORT=$(free_port)
+while [ "$CLIENT_PORT" = "$SERVER_PORT" ]; do export CLIENT_PORT=$(free_port); done
+export COMPOSE_PROJECT_NAME=$(basename "$PWD" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9\n' '-')
 docker compose up --build -d
+echo "Frontend: http://localhost:$CLIENT_PORT"
+echo "API: http://localhost:$SERVER_PORT/api/health"
 ```
 
-- **Frontend**: http://localhost:3000
-- **API**: http://localhost:8080/api
-- **Postgres**: localhost:5432 (`postgres` / `postgres`, db `scraps`)
+Postgres is shared at localhost:5432 (`postgres` / `postgres`, db `scraps`).
+Keep the exported variables for later Compose commands in this terminal. With the
+same project name, recover ports using `docker compose port client 80` and
+`docker compose port server 8080`.
 
 Open the frontend, register a member with a name and email, then choose a member
 in the posting dropdown to write a scrap. Click a scrap's reply count to expand
@@ -46,46 +60,53 @@ Check startup and API availability:
 ```bash
 docker compose ps
 docker compose logs server
-curl --fail http://localhost:8080/api/health
+curl --fail "http://localhost:$SERVER_PORT/api/health"
 # {"status":"ok"}
 ```
 
 To stop:
 
 ```bash
-docker compose down        # keep data
-docker compose down -v     # also wipe the database
+docker compose down        # stop only this worktree’s app; shared data stays
 ```
+
+The shared database serves every worktree. Stop or reset it only with explicit
+user approval; deleting its volume permanently deletes data for all worktrees.
 
 ## Local development
 
 Requires Go 1.24 or newer, Node.js 22.12 or newer with npm, and PostgreSQL 16.
 Run commands from the repository root unless a step says otherwise. The API and
-Vite server run in separate terminals; the database can run locally or in Docker.
+Vite server run in separate terminals and reuse the shared database.
 
-1. Start a Postgres instance, e.g.:
-
-   ```bash
-   docker run -d --name pg -p 5432:5432 \
-     -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
-     -e POSTGRES_DB=scraps postgres:16-alpine
-   ```
-
-2. Run the Go API (auto-migrates schema on startup):
+1. Start the existing shared Postgres (never create a second database container):
 
    ```bash
-   go run ./cmd/server
-   # listens on :8080, expects DATABASE_URL or defaults to
-   # postgres://postgres:postgres@localhost:5432/scraps?sslmode=disable
+   docker compose -f docker-compose.db.yml up -d --wait
    ```
 
-3. Run the Vite dev server (hot reload, proxies `/api` → `:8080`):
+2. In Bash, define `free_port` using the function from Quick start, then select
+   distinct free ports and run the Go API (auto-migrates on startup):
 
    ```bash
-   cd client
-   npm install
-   npm run dev            # http://localhost:3000
+   export SERVER_PORT=$(free_port)
+   export CLIENT_PORT=$(free_port)
+   while [ "$CLIENT_PORT" = "$SERVER_PORT" ]; do export CLIENT_PORT=$(free_port); done
+   echo "Frontend: http://localhost:$CLIENT_PORT"
+   echo "API: http://localhost:$SERVER_PORT/api/health"
+   ADDR=":$SERVER_PORT" go run ./cmd/server
    ```
+
+3. In a second terminal, set `SERVER_PORT` and `CLIENT_PORT` to the values
+   printed above. Start Vite with the matching API proxy target:
+
+   ```bash
+   npm ci --prefix client
+   API_URL="http://localhost:$SERVER_PORT" npm run dev --prefix client -- --port "$CLIENT_PORT" --strictPort
+   ```
+
+The API uses the shared database on localhost:5432 by default. If a selected port
+becomes occupied before startup, select another free port and update both commands.
 
 ## Environment variables
 
@@ -104,7 +125,7 @@ starting Vite if your local API uses another address:
 API_URL=http://localhost:9090 npm run dev --prefix client
 ```
 
-Compose sets the server's database URL to the `db` service and its listen address
+Compose sets the server's database URL to the shared `scraps-db` container and its listen address
 to `:8080` explicitly in `docker-compose.yml`. Edit that configuration to change
 container settings; the table above describes defaults for local development.
 
@@ -141,20 +162,20 @@ Create a member, then use the returned `id` as `user_id` when posting. Replace t
 example IDs below with the IDs returned by your requests.
 
 ```bash
-curl --fail http://localhost:8080/api/users \
+curl --fail http://localhost:$SERVER_PORT/api/users \
   -H 'Content-Type: application/json' \
   -d '{"name":"Ada","email":"ada@example.com","avatar":"🌻"}'
 
-curl --fail http://localhost:8080/api/scraps \
+curl --fail http://localhost:$SERVER_PORT/api/scraps \
   -H 'Content-Type: application/json' \
   -d '{"user_id":1,"content":"Hello, scrapbook!"}'
 
-curl --fail http://localhost:8080/api/scraps/1/replies \
+curl --fail http://localhost:$SERVER_PORT/api/scraps/1/replies \
   -H 'Content-Type: application/json' \
   -d '{"user_id":1,"content":"Welcome!"}'
 
-curl --fail 'http://localhost:8080/api/scraps?limit=10'
-curl --fail http://localhost:8080/api/scraps/1/replies
+curl --fail "http://localhost:$SERVER_PORT/api/scraps?limit=10"
+curl --fail http://localhost:$SERVER_PORT/api/scraps/1/replies
 ```
 
 ## Database schema
@@ -165,8 +186,8 @@ Three tables, auto-created on server startup (idempotent `CREATE TABLE IF NOT EX
 There is no separate migration tool. The schema script runs on every startup and
 creates missing tables, but edits to an existing table's definition do not add
 columns to that table. Apply an appropriate `ALTER TABLE` manually for existing
-databases, or reset disposable local data with `docker compose down -v` before
-rebuilding. The reset permanently deletes the Compose database volume.
+databases. Resetting the shared database volume requires explicit user approval
+because it permanently deletes data used by every worktree.
 
 ## Build & checks
 
@@ -177,6 +198,6 @@ npm run build --prefix client   # frontend production build
 docker compose build            # build all container images
 ```
 
-Before committing, also start the full stack with `docker compose up --build -d`
-and exercise health, user creation, scrap creation, and replies using the examples
+Before committing, start the full stack using the shared database and free ports
+in Quick start, then exercise health, user creation, scrap creation, and replies using the examples
 above.
