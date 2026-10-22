@@ -1,6 +1,6 @@
 # fullstack-go
 
-An Orkut-style scrapbook portal. Register users, post scraps, and reply to anyone's scrap — no authentication, all APIs are public.
+An Orkut-style scrapbook portal. Register members, post scraps, and reply to anyone's scrap. There is no authentication: all APIs are public.
 
 ## Stack
 
