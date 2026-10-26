@@ -2,6 +2,14 @@
 
 An Orkut-style scrapbook portal. Register members, post scraps, and reply to anyone's scrap. There is no authentication: all APIs are public.
 
+## Features
+
+- Register members by name and email (re-registering an email updates the name)
+- Post scraps as any registered member; newest scraps appear first
+- Expand a scrap to read its replies and add your own
+- Feed errors are shown in the UI with a Retry button
+- Accessible form labels and visible keyboard focus styles
+
 ## Stack
 
 | Layer    | Tech                                   |
@@ -194,6 +202,7 @@ because it permanently deletes data used by every worktree.
 ```bash
 go build ./... && go vet ./...   # backend
 npm ci --prefix client          # install locked frontend dependencies
+npm run lint --prefix client    # frontend lint (oxlint)
 npm run build --prefix client   # frontend production build
 docker compose build            # build all container images
 ```
@@ -201,3 +210,7 @@ docker compose build            # build all container images
 Before committing, start the full stack using the shared database and free ports
 in Quick start, then exercise health, user creation, scrap creation, and replies using the examples
 above.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
