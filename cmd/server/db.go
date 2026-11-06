@@ -11,7 +11,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// DB wraps the sql.DB connection with retry-on-startup.
+// asdasdad aDB wraps the sql.DB connection with retry-on-startup.
 type DB struct {
 	*sql.DB
 }
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS replies (
 	return err
 }
 
-// ---- models ----
+// ----sdsdsd models ----
 
 type User struct {
 	ID        int64     `json:"id"`
@@ -96,7 +96,7 @@ type Reply struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// ---- queries ----
+// ---- sdsdsdqueries ----
 
 func (d *DB) CreateUser(ctx context.Context, name, email, avatar string) (*User, error) {
 	name = strings.TrimSpace(name)

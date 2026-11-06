@@ -18,7 +18,7 @@ type Handler struct {
 	DB *DB
 }
 
-// CORS allows the Vite dev server to call the API.
+// CORS sdsds allows the Vite dev server to call the API.
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")

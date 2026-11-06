@@ -35,7 +35,7 @@ function RegisterForm({ onRegistered }) {
       setBusy(false)
     }
   }
-
+// sdsd
   return (
     <form className="card register-form" onSubmit={submit}>
       <h2>Register</h2>
@@ -92,7 +92,7 @@ function ScrapForm({ users, currentUser, onPosted }) {
       setBusy(false)
     }
   }
-
+//sdsds
   return (
     <form className="card scrap-form" onSubmit={submit}>
       <h2>Post a scrap</h2>
@@ -119,7 +119,7 @@ function ScrapForm({ users, currentUser, onPosted }) {
     </form>
   )
 }
-
+// sdsds
 function ReplyForm({ scrapId, users, onReplied }) {
   const [content, setContent] = useState('')
   const [userId, setUserId] = useState('')
@@ -140,7 +140,7 @@ function ReplyForm({ scrapId, users, onReplied }) {
       setError(err.message)
     }
   }
-
+//sdsdsd
   return (
     <form className="reply-form" onSubmit={submit}>
       <input
@@ -235,7 +235,7 @@ export default function App() {
         <h1>📜 Scraps</h1>
         <p className="muted">A nostalgic Orkut-style scrapbook — no login needed.</p>
       </header>
-
+ssss
       <main>
         <aside>
           <RegisterForm
