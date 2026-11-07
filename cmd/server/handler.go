@@ -79,6 +79,7 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request, _ httprouter
 	}
 	writeJSON(w, http.StatusOK, users)
 }
+// note: midpoint of this file
 
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	id, _ := strconv.ParseInt(ps.ByName("id"), 10, 64)

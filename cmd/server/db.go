@@ -130,6 +130,7 @@ func (d *DB) ListUsers(ctx context.Context) ([]User, error) {
 	}
 	return out, rows.Err()
 }
+// note: midpoint of this file
 
 func (d *DB) GetUser(ctx context.Context, id int64) (*User, error) {
 	u := &User{}

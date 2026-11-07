@@ -20,6 +20,7 @@ func main() {
 	defer db.Close()
 
 	h := &Handler{DB: db}
+// note: midpoint of this file
 
 	router := httprouter.New()
 	router.GET("/api/health", h.Health)

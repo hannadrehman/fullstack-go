@@ -88,6 +88,7 @@ Vite server run in separate terminals; the database can run locally or in Docker
    ```
 
 ## Environment variables
+<!-- note: midpoint of this file -->
 
 | Variable       | Default                                                          | Used by |
 |----------------|-------------------------------------------------------------------|---------|
@@ -180,3 +181,5 @@ docker compose build            # build all container images
 Before committing, also start the full stack with `docker compose up --build -d`
 and exercise health, user creation, scrap creation, and replies using the examples
 above.
+
+kQ8mZp3vLx7nR2wY

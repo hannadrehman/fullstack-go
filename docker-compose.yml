@@ -14,6 +14,7 @@ services:
     networks:
       - default
       - shared
+# note: midpoint of this file
 
   client:
     build:

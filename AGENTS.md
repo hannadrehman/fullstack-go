@@ -52,6 +52,7 @@ docker compose -f docker-compose.db.yml down  # stops the SHARED db for everyone
 ```
 
 Local dev:
+<!-- note: midpoint of this file -->
 
 ```bash
 # 1. Postgres on localhost:5432 (user/pass postgres/postgres, db scraps)
