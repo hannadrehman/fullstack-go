@@ -1,67 +1,181 @@
-* {
-  box-sizing: border-box;
+:root {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --panel: #f8f9fb;
+  --border: #e4e6eb;
+  --border-strong: #cfd3da;
+  --text: #1f2328;
+  --text-soft: #5f6368;
+  --muted: #8a9099;
+  --accent: #3969ef;
+  --accent-hover: #2d56d4;
+  --accent-soft: #eef3ff;
+  --danger: #c5221f;
+  --radius: 12px;
+  --radius-sm: 8px;
 }
 
 body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #f0e8d8;
-  color: #3b3022;
+  background: var(--bg);
 }
 
-.app {
-  max-width: 960px;
+/* Top bar: a slim header with the brand and member/scrap counts */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar-inner {
+  max-width: 920px;
   margin: 0 auto;
-  padding: 24px 16px;
-}
-
-header {
-  text-align: center;
-  margin-bottom: 24px;
-}
-
-header h1 {
-  margin: 0;
-  font-size: 2.2rem;
-}
-
-main {
-  display: grid;
-  grid-template-columns: 300px 1fr;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  background: var(--accent-soft);
+}
+
+.brand h1 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.brand p {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.stats {
+  display: flex;
+  gap: 8px;
+}
+
+.pill {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+/* Layout: one reading column, with the sidebar as a quiet side panel */
+main {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 20px 20px 64px;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 32px;
   align-items: start;
+}
+
+aside {
+  position: sticky;
+  top: 72px;
+}
+
+.feed {
+  min-width: 0;
 }
 
 @media (max-width: 720px) {
   main {
     grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  aside {
+    position: static;
+  }
+
+  .stats {
+    display: none;
   }
 }
 
+/* Panels: flat sections with no heavy shadows */
 .card {
-  background: #fffdf5;
-  border: 1px solid #d8c9a8;
-  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 16px;
   margin-bottom: 16px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .card h2 {
-  margin-top: 0;
-  font-size: 1.1rem;
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
+.card-sub {
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.count {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+/* Form controls */
 input,
 textarea,
 select {
   width: 100%;
-  padding: 8px 10px;
-  border: 1px solid #c9b894;
-  border-radius: 6px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
   font: inherit;
-  background: #fff;
+  font-size: 0.9rem;
+  color: var(--text);
+  background: var(--surface);
   margin-bottom: 8px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(57, 105, 239, 0.15);
 }
 
 textarea {
@@ -69,17 +183,21 @@ textarea {
 }
 
 button {
-  background: #d94f2b;
+  background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 6px;
-  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  padding: 9px 16px;
   font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
 }
 
 button:hover {
-  background: #c24322;
+  background: var(--accent-hover);
 }
 
 button:disabled {
@@ -87,34 +205,69 @@ button:disabled {
   cursor: not-allowed;
 }
 
-button.link {
-  background: none;
-  color: #a05a1a;
-  padding: 4px 0;
-  font-size: 0.85rem;
-}
-
-.row {
-  display: flex;
-  gap: 8px;
-}
-
-.row select {
-  margin-bottom: 0;
+.register-form button {
+  width: 100%;
 }
 
 .error {
-  color: #b3261e;
-  font-size: 0.85rem;
+  color: var(--danger);
+  font-size: 0.82rem;
   margin: 4px 0;
 }
 
 .muted {
-  color: #8a7a5f;
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
-.feed {
-  min-height: 400px;
+/* Composer: the "search box" at the top of the feed */
+.scrap-form {
+  position: relative;
+  isolation: isolate;
+  padding: 14px 16px 12px;
+  margin-bottom: 24px;
+  background: var(--panel);
+  border-color: transparent;
+}
+
+.composer-input {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 1rem;
+  min-height: 64px;
+  resize: none;
+  margin-bottom: 8px;
+}
+
+.composer-input:focus {
+  box-shadow: none;
+}
+
+.composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.composer-footer select {
+  width: auto;
+  min-width: 180px;
+  margin-bottom: 0;
+  background: var(--surface);
+}
+
+/* Feed: each scrap is a flat row, like a search result */
+.scrap {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.scrap:first-child {
+  padding-top: 0;
 }
 
 .scrap-header {
@@ -123,65 +276,185 @@ button.link {
   gap: 10px;
 }
 
+.meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.meta strong {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.time {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
 .avatar {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: #e8b04a;
   color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-weight: bold;
+  font-weight: 600;
+  font-size: 0.85rem;
   flex-shrink: 0;
 }
 
 .avatar.small {
   width: 24px;
   height: 24px;
-  font-size: 0.8rem;
-}
-
-.time {
-  display: block;
-  font-size: 0.75rem;
-  color: #8a7a5f;
+  font-size: 0.72rem;
 }
 
 .scrap-content {
-  margin: 10px 0;
+  margin: 10px 0 10px 42px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Reply toggle: a quiet text link, not a pill button */
+.reply-toggle {
+  margin-left: 42px;
+  padding: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.reply-toggle:hover,
+.reply-toggle.active {
+  background: none;
+  text-decoration: underline;
 }
 
 .replies {
-  margin-top: 10px;
-  border-top: 1px dashed #d8c9a8;
-  padding-top: 10px;
+  margin: 12px 0 0 42px;
+  padding-left: 12px;
+  border-left: 2px solid var(--border);
 }
 
 .reply {
-  margin-bottom: 10px;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.reply-body {
+  flex: 1;
 }
 
 .reply p {
   margin: 2px 0 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
 }
 
 .reply-form {
   display: grid;
-  gap: 6px;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
   margin-top: 8px;
 }
 
+.reply-form input,
+.reply-form select {
+  margin-bottom: 0;
+}
+
+.reply-form .error {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 520px) {
+  .reply-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Members: a plain list in the sidebar */
 .members {
   list-style: none;
   padding: 0;
-  margin: 0;
+  margin: 8px 0 0;
 }
 
 .members li {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 0;
+  gap: 10px;
+  padding: 5px 0;
+  font-size: 0.88rem;
+}
+
+/* Glow sweep on the composer while a post is in flight. Adapted from
+   DuckDuckGo's Search Assist card. Only the composer uses it now. */
+.glow-layer {
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.glow-loop .glow-layer {
+  opacity: 1;
+}
+
+.glow-layer::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 150%;
+  aspect-ratio: 1;
+  background: conic-gradient(#3969ef, #8b5cf6, #de5833, #3969ef);
+  filter: blur(20px);
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+
+.glow-layer::after {
+  content: '';
+  position: absolute;
+  inset: 1.5px;
+  background: var(--panel);
+  border-radius: calc(var(--radius) - 1.5px);
+}
+
+.glow-loop .glow-layer::before {
+  animation: glow-spin 2.5s linear infinite;
+}
+
+@keyframes glow-spin {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+    opacity: 0;
+  }
+  15%,
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(1turn);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glow-layer::before {
+    animation: none !important;
+  }
 }

@@ -12,6 +12,21 @@ function timeAgo(iso) {
   return `${Math.floor(hours / 24)}d ago`
 }
 
+function Avatar({ name, emoji, size = '' }) {
+  let hue = 0
+  for (const ch of name || '') hue = (hue * 31 + ch.charCodeAt(0)) % 360
+  return (
+    <span
+      className={`avatar ${size}`}
+      style={{
+        background: `linear-gradient(135deg, hsl(${hue} 75% 62%), hsl(${(hue + 40) % 360} 70% 52%))`,
+      }}
+    >
+      {emoji || name?.[0]?.toUpperCase() || '?'}
+    </span>
+  )
+}
+
 function RegisterForm({ onRegistered }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -38,7 +53,8 @@ function RegisterForm({ onRegistered }) {
 
   return (
     <form className="card register-form" onSubmit={submit}>
-      <h2>Register</h2>
+      <h2>Join the scrapbook</h2>
+      <p className="card-sub">Pick a name and start posting.</p>
       <input
         placeholder="Name"
         value={name}
@@ -94,16 +110,20 @@ function ScrapForm({ users, currentUser, onPosted }) {
   }
 
   return (
-    <form className="card scrap-form" onSubmit={submit}>
-      <h2>Post a scrap</h2>
+    <form
+      className={`card scrap-form glow ${busy ? 'glow-loop' : ''}`}
+      onSubmit={submit}
+    >
+      <div className="glow-layer" aria-hidden="true" />
       <textarea
-        placeholder="Write something for everyone…"
+        className="composer-input"
+        placeholder="What's on your mind? Leave a scrap for everyone…"
         rows={3}
         value={content}
         onChange={(e) => setContent(e.target.value)}
         required
       />
-      <div className="row">
+      <div className="composer-footer">
         <select value={userId} onChange={(e) => setUserId(e.target.value)}>
           <option value="">— posting as —</option>
           {users.map((u) => (
@@ -173,18 +193,19 @@ function Scrap({ scrap, users, onReply }) {
   }
 
   return (
-    <div className="card scrap">
+    <article className="scrap">
       <div className="scrap-header">
-        <span className="avatar">
-          {scrap.author?.[0]?.toUpperCase() || '?'}
-        </span>
-        <div>
+        <Avatar name={scrap.author} />
+        <div className="meta">
           <strong>{scrap.author}</strong>
           <span className="time">{timeAgo(scrap.created_at)}</span>
         </div>
       </div>
       <p className="scrap-content">{scrap.content}</p>
-      <button className="link" onClick={loadReplies}>
+      <button
+        className={`reply-toggle ${showReplies ? 'active' : ''}`}
+        onClick={loadReplies}
+      >
         {scrap.reply_count} {scrap.reply_count === 1 ? 'reply' : 'replies'}{' '}
         {showReplies ? '▾' : '▸'}
       </button>
@@ -192,9 +213,14 @@ function Scrap({ scrap, users, onReply }) {
         <div className="replies">
           {(replies || []).map((r) => (
             <div key={r.id} className="reply">
-              <strong>{r.author}</strong>
-              <span className="time">{timeAgo(r.created_at)}</span>
-              <p>{r.content}</p>
+              <Avatar name={r.author} size="small" />
+              <div className="reply-body">
+                <div className="meta">
+                  <strong>{r.author}</strong>
+                  <span className="time">{timeAgo(r.created_at)}</span>
+                </div>
+                <p>{r.content}</p>
+              </div>
             </div>
           ))}
           {replies?.length === 0 && <p className="muted">No replies yet.</p>}
@@ -208,7 +234,7 @@ function Scrap({ scrap, users, onReply }) {
           />
         </div>
       )}
-    </div>
+    </article>
   )
 }
 
@@ -231,9 +257,20 @@ export default function App() {
 
   return (
     <div className="app">
-      <header>
-        <h1>📜 Scraps</h1>
-        <p className="muted">A nostalgic Orkut-style scrapbook — no login needed.</p>
+      <header className="topbar">
+        <div className="topbar-inner">
+          <div className="brand">
+            <span className="brand-mark">📜</span>
+            <div>
+              <h1>Scraps</h1>
+              <p>A nostalgic Orkut-style scrapbook — no login needed.</p>
+            </div>
+          </div>
+          <div className="stats">
+            <span className="pill">{users.length} members</span>
+            <span className="pill">{scraps.length} scraps</span>
+          </div>
+        </div>
       </header>
 
       <main>
@@ -245,13 +282,13 @@ export default function App() {
             }}
           />
           <div className="card">
-            <h2>Members ({users.length})</h2>
+            <h2>
+              Members <span className="count">{users.length}</span>
+            </h2>
             <ul className="members">
               {users.map((u) => (
                 <li key={u.id}>
-                  <span className="avatar small">
-                    {u.avatar || u.name?.[0]?.toUpperCase() || '?'}
-                  </span>
+                  <Avatar name={u.name} emoji={u.avatar} size="small" />
                   {u.name}
                 </li>
               ))}

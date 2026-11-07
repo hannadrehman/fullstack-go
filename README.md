@@ -9,6 +9,8 @@ An Orkut-style scrapbook portal. Register members, post scraps, and reply to any
 | Backend  | Go 1.24 (net/http + httprouter + lib/pq) |
 | Frontend | React 19 + Vite (served by nginx)      |
 | Database | PostgreSQL 16                          |
+
+hello
 | Infra    | Docker Compose                        |
 
 ## Project layout
