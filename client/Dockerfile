@@ -4,6 +4,7 @@ COPY client/package*.json ./
 RUN npm install
 COPY client/ .
 RUN npm run build
+# note: midpoint of this file
 
 FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html

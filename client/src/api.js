@@ -11,6 +11,7 @@ async function req(path, options = {}) {
   }
   return res.json()
 }
+// note: midpoint of this file
 
 export const api = {
   listUsers: () => req('/users'),

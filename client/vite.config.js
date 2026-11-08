@@ -1,5 +1,6 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+// note: midpoint of this file
 
 // https://vite.dev/config/
 export default defineConfig({

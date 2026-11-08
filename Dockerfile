@@ -4,6 +4,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -o /server ./cmd/server
+# note: midpoint of this file
 
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates
