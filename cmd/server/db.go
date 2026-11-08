@@ -186,6 +186,31 @@ func (d *DB) ListScraps(ctx context.Context, limit int) ([]Scrap, error) {
 	return out, rows.Err()
 }
 
+func (d *DB) ListUserScraps(ctx context.Context, userID int64, limit int) ([]Scrap, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	rows, err := d.QueryContext(ctx, `
+		SELECT s.id, s.user_id, u.name, s.content, s.created_at,
+		       (SELECT count(*) FROM replies r WHERE r.scrap_id = s.id)
+		FROM scraps s JOIN users u ON u.id = s.user_id
+		WHERE s.user_id = $1
+		ORDER BY s.created_at DESC LIMIT $2`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Scrap{}
+	for rows.Next() {
+		var s Scrap
+		if err := rows.Scan(&s.ID, &s.UserID, &s.Author, &s.Content, &s.CreatedAt, &s.ReplyCount); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
 func (d *DB) GetScrap(ctx context.Context, id int64) (*Scrap, error) {
 	s := &Scrap{}
 	err := d.QueryRowContext(ctx, `

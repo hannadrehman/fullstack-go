@@ -163,7 +163,7 @@ function ReplyForm({ scrapId, users, onReplied }) {
   )
 }
 
-function Scrap({ scrap, users, onReply }) {
+function Scrap({ scrap, users, onReply, onProfile }) {
   const [replies, setReplies] = useState(null)
   const [showReplies, setShowReplies] = useState(false)
 
@@ -179,7 +179,7 @@ function Scrap({ scrap, users, onReply }) {
           {scrap.author?.[0]?.toUpperCase() || '?'}
         </span>
         <div>
-          <strong>{scrap.author}</strong>
+          <button className="link" onClick={() => onProfile(scrap.user_id)}>{scrap.author}</button>
           <span className="time">{timeAgo(scrap.created_at)}</span>
         </div>
       </div>
@@ -192,7 +192,7 @@ function Scrap({ scrap, users, onReply }) {
         <div className="replies">
           {(replies || []).map((r) => (
             <div key={r.id} className="reply">
-              <strong>{r.author}</strong>
+              <button className="link" onClick={() => onProfile(r.user_id)}>{r.author}</button>
               <span className="time">{timeAgo(r.created_at)}</span>
               <p>{r.content}</p>
             </div>
@@ -212,11 +212,52 @@ function Scrap({ scrap, users, onReply }) {
   )
 }
 
+function Profile({ userId, users, onBack, onProfile }) {
+  const [user, setUser] = useState(null)
+  const [scraps, setScraps] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    setError('')
+    Promise.all([api.getUser(userId), api.listUserScraps(userId)])
+      .then(([member, memberScraps]) => {
+        if (!active) return
+        setUser(member)
+        setScraps(memberScraps || [])
+      })
+      .catch((err) => { if (active) setError(err.message) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [userId])
+
+  if (loading) return <section className="feed"><p className="muted">Loading member…</p></section>
+  if (error) return <section className="feed"><button className="link" onClick={onBack}>← Back to scraps</button><p className="error">{/404|not found/i.test(error) ? 'Member not found.' : error}</p></section>
+
+  return (
+    <section className="feed">
+      <button className="link" onClick={onBack}>← Back to scraps</button>
+      <div className="card">
+        <div className="scrap-header">
+          <span className="avatar">{user.avatar || user.name?.[0]?.toUpperCase() || '?'}</span>
+          <div><h2>{user.name}</h2><span className="time">Joined {timeAgo(user.created_at)}</span></div>
+        </div>
+      </div>
+      <h2>Scraps</h2>
+      {scraps.length === 0 && <p className="muted">No scraps yet.</p>}
+      {scraps.map((s) => <Scrap key={s.id} scrap={s} users={users} onReply={() => {}} onProfile={onProfile} />)}
+    </section>
+  )
+}
+
 export default function App() {
   const [users, setUsers] = useState([])
   const [scraps, setScraps] = useState([])
   const [currentUser, setCurrentUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [profileId, setProfileId] = useState(null)
 
   async function refresh() {
     const [u, s] = await Promise.all([api.listUsers(), api.listScraps()])
@@ -252,7 +293,7 @@ export default function App() {
                   <span className="avatar small">
                     {u.avatar || u.name?.[0]?.toUpperCase() || '?'}
                   </span>
-                  {u.name}
+                  <button className="link" onClick={() => setProfileId(u.id)}>{u.name}</button>
                 </li>
               ))}
               {users.length === 0 && (
@@ -262,16 +303,16 @@ export default function App() {
           </div>
         </aside>
 
-        <section className="feed">
+        {profileId ? <Profile userId={profileId} users={users} onBack={() => setProfileId(null)} onProfile={setProfileId} /> : <section className="feed">
           <ScrapForm users={users} currentUser={currentUser} onPosted={refresh} />
           {loading && <p className="muted">Loading scraps…</p>}
           {!loading && scraps.length === 0 && (
             <p className="muted">No scraps yet. Post the first one!</p>
           )}
           {scraps.map((s) => (
-            <Scrap key={s.id} scrap={s} users={users} onReply={refresh} />
+            <Scrap key={s.id} scrap={s} users={users} onReply={refresh} onProfile={setProfileId} />
           ))}
-        </section>
+        </section>}
       </main>
     </div>
   )
