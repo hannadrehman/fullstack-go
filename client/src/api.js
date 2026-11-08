@@ -14,6 +14,8 @@ async function req(path, options = {}) {
 
 export const api = {
   listUsers: () => req('/users'),
+  getUser: (id) => req(`/users/${id}`),
+  listUserScraps: (id) => req(`/users/${id}/scraps`),
   createUser: (user) =>
     req('/users', { method: 'POST', body: JSON.stringify(user) }),
   listScraps: () => req('/scraps'),

@@ -90,6 +90,21 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request, ps httprouter.
 	writeJSON(w, http.StatusOK, u)
 }
 
+func (h *Handler) ListUserScraps(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	id, _ := strconv.ParseInt(ps.ByName("id"), 10, 64)
+	if _, err := h.DB.GetUser(r.Context(), id); err != nil {
+		writeErr(w, err)
+		return
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	scraps, err := h.DB.ListUserScraps(r.Context(), id, limit)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, scraps)
+}
+
 func (h *Handler) CreateScrap(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var req struct {
 		UserID  int64  `json:"user_id"`

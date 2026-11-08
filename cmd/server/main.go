@@ -26,6 +26,7 @@ func main() {
 	router.POST("/api/users", h.CreateUser)
 	router.GET("/api/users", h.ListUsers)
 	router.GET("/api/users/:id", h.GetUser)
+	router.GET("/api/users/:id/scraps", h.ListUserScraps)
 	router.POST("/api/scraps", h.CreateScrap)
 	router.GET("/api/scraps", h.ListScraps)
 	router.GET("/api/scraps/:id", h.GetScrap)
