@@ -63,6 +63,10 @@ CREATE TABLE IF NOT EXISTS replies (
 	content TEXT NOT NULL,
 	created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Wall scraps: a scrap written on someone's scrapbook. NULL = global feed post.
+-- ALTER is needed because CREATE TABLE IF NOT EXISTS skips existing databases.
+ALTER TABLE scraps ADD COLUMN IF NOT EXISTS to_user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;
 `
 	_, err := db.Exec(schema)
 	return err
@@ -82,6 +86,8 @@ type Scrap struct {
 	ID         int64     `json:"id"`
 	UserID     int64     `json:"user_id"`
 	Author     string    `json:"author"`
+	ToUserID   *int64    `json:"to_user_id"`
+	Recipient  string    `json:"recipient,omitempty"`
 	Content    string    `json:"content"`
 	CreatedAt  time.Time `json:"created_at"`
 	ReplyCount int       `json:"reply_count"`
@@ -143,87 +149,110 @@ func (d *DB) GetUser(ctx context.Context, id int64) (*User, error) {
 	return u, err
 }
 
-func (d *DB) CreateScrap(ctx context.Context, userID int64, content string) (*Scrap, error) {
+// scrapSelect is the shared projection for every scrap read. Keep it in sync
+// with scanScrap.
+const scrapSelect = `
+	SELECT s.id, s.user_id, u.name, s.to_user_id, COALESCE(ru.name, ''), s.content, s.created_at,
+	       (SELECT count(*) FROM replies r WHERE r.scrap_id = s.id)
+	FROM scraps s
+	JOIN users u ON u.id = s.user_id
+	LEFT JOIN users ru ON ru.id = s.to_user_id`
+
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanScrap(row rowScanner) (Scrap, error) {
+	var s Scrap
+	var toUserID sql.NullInt64
+	err := row.Scan(&s.ID, &s.UserID, &s.Author, &toUserID, &s.Recipient, &s.Content, &s.CreatedAt, &s.ReplyCount)
+	if toUserID.Valid {
+		s.ToUserID = &toUserID.Int64
+	}
+	return s, err
+}
+
+func scanScraps(rows *sql.Rows) ([]Scrap, error) {
+	defer rows.Close()
+	out := []Scrap{}
+	for rows.Next() {
+		s, err := scanScrap(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+// CreateScrap posts a scrap. toUserID nil means a global feed post; otherwise
+// the scrap lands on that member's scrapbook.
+func (d *DB) CreateScrap(ctx context.Context, userID int64, toUserID *int64, content string) (*Scrap, error) {
 	content = strings.TrimSpace(content)
-	if content == "" || userID <= 0 {
+	if content == "" || userID <= 0 || (toUserID != nil && *toUserID <= 0) {
 		return nil, ErrValidation
 	}
-	s := &Scrap{}
+	var to sql.NullInt64
+	if toUserID != nil {
+		if _, err := d.GetUser(ctx, *toUserID); errors.Is(err, ErrNotFound) {
+			return nil, ErrValidation
+		} else if err != nil {
+			return nil, err
+		}
+		to = sql.NullInt64{Int64: *toUserID, Valid: true}
+	}
+	var id int64
 	err := d.QueryRowContext(ctx,
-		`INSERT INTO scraps (user_id, content) VALUES ($1,$2)
-		 RETURNING id, user_id, content, created_at`,
-		userID, content,
-	).Scan(&s.ID, &s.UserID, &s.Content, &s.CreatedAt)
+		`INSERT INTO scraps (user_id, to_user_id, content) VALUES ($1,$2,$3) RETURNING id`,
+		userID, to, content,
+	).Scan(&id)
 	if err != nil {
 		return nil, err
 	}
-	if err := d.QueryRowContext(ctx, `SELECT name FROM users WHERE id=$1`, userID).Scan(&s.Author); err != nil {
-		return nil, err
-	}
-	return s, nil
+	return d.GetScrap(ctx, id)
 }
 
 func (d *DB) ListScraps(ctx context.Context, limit int) ([]Scrap, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
-	rows, err := d.QueryContext(ctx, `
-		SELECT s.id, s.user_id, u.name, s.content, s.created_at,
-		       (SELECT count(*) FROM replies r WHERE r.scrap_id = s.id)
-		FROM scraps s JOIN users u ON u.id = s.user_id
-		ORDER BY s.created_at DESC LIMIT $1`, limit)
+	rows, err := d.QueryContext(ctx, scrapSelect+` WHERE s.to_user_id IS NULL ORDER BY s.created_at DESC LIMIT $1`, limit)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Scrap
-	for rows.Next() {
-		var s Scrap
-		if err := rows.Scan(&s.ID, &s.UserID, &s.Author, &s.Content, &s.CreatedAt, &s.ReplyCount); err != nil {
-			return nil, err
-		}
-		out = append(out, s)
-	}
-	return out, rows.Err()
+	return scanScraps(rows)
 }
 
+// ListUserScraps returns scraps the member wrote, wherever they were posted.
 func (d *DB) ListUserScraps(ctx context.Context, userID int64, limit int) ([]Scrap, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
-	rows, err := d.QueryContext(ctx, `
-		SELECT s.id, s.user_id, u.name, s.content, s.created_at,
-		       (SELECT count(*) FROM replies r WHERE r.scrap_id = s.id)
-		FROM scraps s JOIN users u ON u.id = s.user_id
-		WHERE s.user_id = $1
-		ORDER BY s.created_at DESC LIMIT $2`, userID, limit)
+	rows, err := d.QueryContext(ctx, scrapSelect+` WHERE s.user_id = $1 ORDER BY s.created_at DESC LIMIT $2`, userID, limit)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	out := []Scrap{}
-	for rows.Next() {
-		var s Scrap
-		if err := rows.Scan(&s.ID, &s.UserID, &s.Author, &s.Content, &s.CreatedAt, &s.ReplyCount); err != nil {
-			return nil, err
-		}
-		out = append(out, s)
+	return scanScraps(rows)
+}
+
+// ListScrapbook returns scraps written on the member's scrapbook.
+func (d *DB) ListScrapbook(ctx context.Context, userID int64, limit int) ([]Scrap, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
 	}
-	return out, rows.Err()
+	rows, err := d.QueryContext(ctx, scrapSelect+` WHERE s.to_user_id = $1 ORDER BY s.created_at DESC LIMIT $2`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	return scanScraps(rows)
 }
 
 func (d *DB) GetScrap(ctx context.Context, id int64) (*Scrap, error) {
-	s := &Scrap{}
-	err := d.QueryRowContext(ctx, `
-		SELECT s.id, s.user_id, u.name, s.content, s.created_at,
-		       (SELECT count(*) FROM replies r WHERE r.scrap_id = s.id)
-		FROM scraps s JOIN users u ON u.id = s.user_id
-		WHERE s.id = $1`, id,
-	).Scan(&s.ID, &s.UserID, &s.Author, &s.Content, &s.CreatedAt, &s.ReplyCount)
+	s, err := scanScrap(d.QueryRowContext(ctx, scrapSelect+` WHERE s.id = $1`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
-	return s, err
+	return &s, err
 }
 
 func (d *DB) CreateReply(ctx context.Context, scrapID, userID int64, content string) (*Reply, error) {

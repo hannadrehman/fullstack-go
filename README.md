@@ -117,7 +117,8 @@ container settings; the table above describes defaults for local development.
 | POST   | `/api/users`                | `{name, email, avatar}`                  | Register (upsert on email) |
 | GET    | `/api/users`                | —                                        | List users |
 | GET    | `/api/users/:id`            | —                                        | Get user |
-| POST   | `/api/scraps`               | `{user_id, content}`                      | Post a scrap |
+| GET    | `/api/users/:id/scrapbook`  | —                                        | Scraps written on this member's scrapbook |
+| POST   | `/api/scraps`               | `{user_id, to_user_id?, content}`         | Post a scrap (`to_user_id` puts it on that member's scrapbook) |
 | GET    | `/api/scraps?limit=N`       | —                                        | List newest scraps first (1–100; otherwise 50) |
 | GET    | `/api/scraps/:id`           | —                                        | Get scrap |
 | POST   | `/api/scraps/:id/replies`   | `{user_id, content}`                     | Reply to a scrap |

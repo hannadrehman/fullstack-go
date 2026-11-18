@@ -64,26 +64,28 @@ function RegisterForm({ onRegistered }) {
   )
 }
 
-function ScrapForm({ users, currentUser, onPosted }) {
+const WHO_AM_I_ERROR = 'Pick who you are under "I am" first.'
+
+// Posts as the current member. With a recipient, the scrap lands on their scrapbook.
+function ScrapForm({ currentUser, recipient, onPosted }) {
   const [content, setContent] = useState('')
-  const [userId, setUserId] = useState(currentUser?.id || '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => {
-    if (currentUser) setUserId(currentUser.id)
-  }, [currentUser])
-
   async function submit(e) {
     e.preventDefault()
-    if (!userId) {
-      setError('Pick who is posting (register first if empty).')
+    if (!currentUser) {
+      setError(WHO_AM_I_ERROR)
       return
     }
     setBusy(true)
     setError('')
     try {
-      await api.createScrap({ user_id: Number(userId), content })
+      await api.createScrap({
+        user_id: currentUser.id,
+        to_user_id: recipient?.id ?? null,
+        content,
+      })
       setContent('')
       onPosted()
     } catch (err) {
@@ -95,45 +97,38 @@ function ScrapForm({ users, currentUser, onPosted }) {
 
   return (
     <form className="card scrap-form" onSubmit={submit}>
-      <h2>Post a scrap</h2>
+      <h2>{recipient ? `Write on ${recipient.name}'s scrapbook` : 'Post a scrap'}</h2>
       <textarea
-        placeholder="Write something for everyone…"
+        placeholder={recipient ? `Say something to ${recipient.name}…` : 'Write something for everyone…'}
         rows={3}
         value={content}
         onChange={(e) => setContent(e.target.value)}
         required
       />
       <div className="row">
-        <select value={userId} onChange={(e) => setUserId(e.target.value)}>
-          <option value="">— posting as —</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.avatar ? `${u.avatar} ` : ''}
-              {u.name}
-            </option>
-          ))}
-        </select>
-        <button disabled={busy}>{busy ? 'Posting…' : 'Post scrap'}</button>
+        <span className="muted">
+          {currentUser ? `as ${currentUser.name}` : 'No one selected'}
+        </span>
+        <button disabled={busy}>{busy ? 'Posting…' : 'Post'}</button>
       </div>
       {error && <p className="error">{error}</p>}
     </form>
   )
 }
 
-function ReplyForm({ scrapId, users, onReplied }) {
+function ReplyForm({ scrapId, currentUser, onReplied }) {
   const [content, setContent] = useState('')
-  const [userId, setUserId] = useState('')
   const [error, setError] = useState('')
 
   async function submit(e) {
     e.preventDefault()
-    if (!userId) {
-      setError('Pick who is replying.')
+    if (!currentUser) {
+      setError(WHO_AM_I_ERROR)
       return
     }
     setError('')
     try {
-      await api.createReply(scrapId, { user_id: Number(userId), content })
+      await api.createReply(scrapId, { user_id: currentUser.id, content })
       setContent('')
       onReplied()
     } catch (err) {
@@ -150,21 +145,13 @@ function ReplyForm({ scrapId, users, onReplied }) {
         onChange={(e) => setContent(e.target.value)}
         required
       />
-      <select value={userId} onChange={(e) => setUserId(e.target.value)}>
-        <option value="">— as —</option>
-        {users.map((u) => (
-          <option key={u.id} value={u.id}>
-            {u.name}
-          </option>
-        ))}
-      </select>
-      <button>Reply</button>
+      <button>Reply{currentUser ? ` as ${currentUser.name}` : ''}</button>
       {error && <p className="error">{error}</p>}
     </form>
   )
 }
 
-function Scrap({ scrap, users, onReply, onProfile }) {
+function Scrap({ scrap, currentUser, onReply, onProfile }) {
   const [replies, setReplies] = useState(null)
   const [showReplies, setShowReplies] = useState(false)
 
@@ -181,6 +168,12 @@ function Scrap({ scrap, users, onReply, onProfile }) {
         </span>
         <div>
           <button className="link" onClick={() => onProfile(scrap.user_id)}>{scrap.author}</button>
+          {scrap.to_user_id && (
+            <>
+              {' ➜ '}
+              <button className="link" onClick={() => onProfile(scrap.to_user_id)}>{scrap.recipient}</button>
+            </>
+          )}
           <span className="time">{timeAgo(scrap.created_at)}</span>
         </div>
       </div>
@@ -201,7 +194,7 @@ function Scrap({ scrap, users, onReply, onProfile }) {
           {replies?.length === 0 && <p className="muted">No replies yet.</p>}
           <ReplyForm
             scrapId={scrap.id}
-            users={users}
+            currentUser={currentUser}
             onReplied={async () => {
               setReplies(await api.listReplies(scrap.id))
               onReply()
@@ -213,29 +206,41 @@ function Scrap({ scrap, users, onReply, onProfile }) {
   )
 }
 
-function Profile({ userId, users, onBack, onProfile }) {
-  const [user, setUser] = useState(null)
-  const [scraps, setScraps] = useState([])
-  const [loading, setLoading] = useState(true)
+function Profile({ userId, currentUser, onBack, onProfile }) {
+  const [data, setData] = useState(null)
   const [error, setError] = useState('')
 
+  // Fetches the member, the scraps they wrote, and their scrapbook together.
+  const fetchProfile = () =>
+    Promise.all([
+      api.getUser(userId),
+      api.listUserScraps(userId),
+      api.listUserScrapbook(userId),
+    ]).then(([user, written, scrapbook]) => ({
+      user,
+      written: written || [],
+      scrapbook: scrapbook || [],
+    }))
+
+  // Refresh after a post or reply. Failures show on the page instead of going unhandled.
+  const load = () => fetchProfile().then(setData).catch((err) => setError(err.message))
+
   useEffect(() => {
+    // Ignore responses for a previous member if the user clicks another profile first.
     let active = true
-    setLoading(true)
+    setData(null)
     setError('')
-    Promise.all([api.getUser(userId), api.listUserScraps(userId)])
-      .then(([member, memberScraps]) => {
-        if (!active) return
-        setUser(member)
-        setScraps(memberScraps || [])
-      })
+    fetchProfile()
+      .then((profile) => { if (active) setData(profile) })
       .catch((err) => { if (active) setError(err.message) })
-      .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
-  if (loading) return <section className="feed"><p className="muted">Loading member…</p></section>
   if (error) return <section className="feed"><button className="link" onClick={onBack}>← Back to scraps</button><p className="error">{/404|not found/i.test(error) ? 'Member not found.' : error}</p></section>
+  if (!data) return <section className="feed"><p className="muted">Loading member…</p></section>
+
+  const { user, written, scrapbook } = data
 
   return (
     <section className="feed">
@@ -246,19 +251,53 @@ function Profile({ userId, users, onBack, onProfile }) {
           <div><h2>{user.name}</h2><span className="time">Joined {timeAgo(user.created_at)}</span></div>
         </div>
       </div>
-      <h2>Scraps</h2>
-      {scraps.length === 0 && <p className="muted">No scraps yet.</p>}
-      {scraps.map((s) => <Scrap key={s.id} scrap={s} users={users} onReply={() => {}} onProfile={onProfile} />)}
+      <ScrapForm currentUser={currentUser} recipient={user} onPosted={load} />
+      <h2>Scrapbook</h2>
+      {scrapbook.length === 0 && <p className="muted">Nothing on {user.name}'s scrapbook yet.</p>}
+      {scrapbook.map((s) => <Scrap key={s.id} scrap={s} currentUser={currentUser} onReply={load} onProfile={onProfile} />)}
+      <h2>Scraps by {user.name}</h2>
+      {written.length === 0 && <p className="muted">No scraps yet.</p>}
+      {written.map((s) => <Scrap key={s.id} scrap={s} currentUser={currentUser} onReply={load} onProfile={onProfile} />)}
     </section>
+  )
+}
+
+const CURRENT_USER_KEY = 'scraps.currentUserId'
+
+function WhoAmI({ users, currentUser, onChange }) {
+  return (
+    <div className="card">
+      <h2>I am</h2>
+      <select value={currentUser?.id ?? ''} onChange={(e) => onChange(e.target.value)}>
+        <option value="">— nobody —</option>
+        {users.map((u) => (
+          <option key={u.id} value={u.id}>
+            {u.avatar ? `${u.avatar} ` : ''}
+            {u.name}
+          </option>
+        ))}
+      </select>
+      <p className="muted">Remembered on this browser.</p>
+    </div>
   )
 }
 
 export default function App() {
   const [users, setUsers] = useState([])
   const [scraps, setScraps] = useState([])
-  const [currentUser, setCurrentUser] = useState(null)
+  const [currentUserId, setCurrentUserId] = useState(() => localStorage.getItem(CURRENT_USER_KEY) || '')
   const [loading, setLoading] = useState(true)
   const [profileId, setProfileId] = useState(null)
+
+  // Derived from the member list, so a deleted member simply stops being "me".
+  const currentUser = users.find((u) => String(u.id) === currentUserId) || null
+
+  function chooseIdentity(id) {
+    const value = id ? String(id) : ''
+    if (value) localStorage.setItem(CURRENT_USER_KEY, value)
+    else localStorage.removeItem(CURRENT_USER_KEY)
+    setCurrentUserId(value)
+  }
 
   async function refresh() {
     const [u, s] = await Promise.all([api.listUsers(), api.listScraps()])
@@ -280,9 +319,10 @@ export default function App() {
 
       <main>
         <aside>
+          <WhoAmI users={users} currentUser={currentUser} onChange={chooseIdentity} />
           <RegisterForm
             onRegistered={(user) => {
-              setCurrentUser(user)
+              chooseIdentity(user.id)
               refresh()
             }}
           />
@@ -304,14 +344,14 @@ export default function App() {
           </div>
         </aside>
 
-        {profileId ? <Profile userId={profileId} users={users} onBack={() => setProfileId(null)} onProfile={setProfileId} /> : <section className="feed">
-          <ScrapForm users={users} currentUser={currentUser} onPosted={refresh} />
+        {profileId ? <Profile userId={profileId} currentUser={currentUser} onBack={() => setProfileId(null)} onProfile={setProfileId} /> : <section className="feed">
+          <ScrapForm currentUser={currentUser} onPosted={refresh} />
           {loading && <p className="muted">Loading scraps…</p>}
           {!loading && scraps.length === 0 && (
             <p className="muted">No scraps yet. Post the first one!</p>
           )}
           {scraps.map((s) => (
-            <Scrap key={s.id} scrap={s} users={users} onReply={refresh} onProfile={setProfileId} />
+            <Scrap key={s.id} scrap={s} currentUser={currentUser} onReply={refresh} onProfile={setProfileId} />
           ))}
         </section>}
       </main>
