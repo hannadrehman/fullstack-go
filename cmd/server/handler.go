@@ -14,17 +14,34 @@ var (
 	ErrNotFound   = errors.New("not found")
 )
 
+// Handler bundles the HTTP handlers together with the database they talk to.
 type Handler struct {
 	DB *DB
 }
 
+// userInput is the body accepted by POST /users.
+type userInput struct {
+	Name   string `json:"name"`
+	Email  string `json:"email"`
+	Avatar string `json:"avatar"`
+}
+
+// postInput is the body shared by scraps and replies.
+type postInput struct {
+	UserID  int64  `json:"user_id"`
+	Content string `json:"content"`
+}
+
 // CORS allows the Vite dev server to call the API.
+// Preflight requests are answered right here and never reach the next handler.
 func CORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		h := w.Header()
+		h.Set("Access-Control-Allow-Origin", "*")
+		h.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		h.Set("Access-Control-Allow-Headers", "Content-Type")
 		if r.Method == http.MethodOptions {
+			// 204: nothing to say, but we are very polite about it.
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -32,6 +49,7 @@ func CORS(next http.Handler) http.Handler {
 	})
 }
 
+// JSON goes in, JSON comes out, magic happens here.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -45,8 +63,32 @@ func writeErr(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "not found"})
 	default:
+		// Something went sideways somewhere deep down. The client gets a polite shrug.
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 	}
+}
+
+// decodeBody reads a JSON request body into v. On failure it writes the 400
+// response itself and reports false, so callers can just return.
+func decodeBody(w http.ResponseWriter, r *http.Request, v any) bool {
+	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+		return false
+	}
+	return true
+}
+
+// pathID pulls the numeric :id segment out of the route. Unparseable ids become 0,
+// which simply matches nothing in the database.
+func pathID(ps httprouter.Params) int64 {
+	id, _ := strconv.ParseInt(ps.ByName("id"), 10, 64)
+	return id
+}
+
+// queryLimit reads the optional ?limit= query parameter. Missing or junk values become 0.
+func queryLimit(r *http.Request) int {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	return limit
 }
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -54,16 +96,11 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request, _ httprouter.Pa
 }
 
 func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	var req struct {
-		Name   string `json:"name"`
-		Email  string `json:"email"`
-		Avatar string `json:"avatar"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+	var in userInput
+	if !decodeBody(w, r, &in) {
 		return
 	}
-	u, err := h.DB.CreateUser(r.Context(), req.Name, req.Email, req.Avatar)
+	u, err := h.DB.CreateUser(r.Context(), in.Name, in.Email, in.Avatar)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -79,11 +116,9 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request, _ httprouter
 	}
 	writeJSON(w, http.StatusOK, users)
 }
-// note: midpoint of this file
 
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	id, _ := strconv.ParseInt(ps.ByName("id"), 10, 64)
-	u, err := h.DB.GetUser(r.Context(), id)
+	u, err := h.DB.GetUser(r.Context(), pathID(ps))
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -92,13 +127,13 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request, ps httprouter.
 }
 
 func (h *Handler) ListUserScraps(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	id, _ := strconv.ParseInt(ps.ByName("id"), 10, 64)
-	if _, err := h.DB.GetUser(r.Context(), id); err != nil {
+	userID := pathID(ps)
+	// Make sure the user exists first, so a bad id gets a proper 404 instead of an empty list.
+	if _, err := h.DB.GetUser(r.Context(), userID); err != nil {
 		writeErr(w, err)
 		return
 	}
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	scraps, err := h.DB.ListUserScraps(r.Context(), id, limit)
+	scraps, err := h.DB.ListUserScraps(r.Context(), userID, queryLimit(r))
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -107,15 +142,11 @@ func (h *Handler) ListUserScraps(w http.ResponseWriter, r *http.Request, ps http
 }
 
 func (h *Handler) CreateScrap(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	var req struct {
-		UserID  int64  `json:"user_id"`
-		Content string `json:"content"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+	var in postInput
+	if !decodeBody(w, r, &in) {
 		return
 	}
-	s, err := h.DB.CreateScrap(r.Context(), req.UserID, req.Content)
+	s, err := h.DB.CreateScrap(r.Context(), in.UserID, in.Content)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -124,8 +155,7 @@ func (h *Handler) CreateScrap(w http.ResponseWriter, r *http.Request, _ httprout
 }
 
 func (h *Handler) ListScraps(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	scraps, err := h.DB.ListScraps(r.Context(), limit)
+	scraps, err := h.DB.ListScraps(r.Context(), queryLimit(r))
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -134,8 +164,7 @@ func (h *Handler) ListScraps(w http.ResponseWriter, r *http.Request, _ httproute
 }
 
 func (h *Handler) GetScrap(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	id, _ := strconv.ParseInt(ps.ByName("id"), 10, 64)
-	s, err := h.DB.GetScrap(r.Context(), id)
+	s, err := h.DB.GetScrap(r.Context(), pathID(ps))
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -144,16 +173,12 @@ func (h *Handler) GetScrap(w http.ResponseWriter, r *http.Request, ps httprouter
 }
 
 func (h *Handler) CreateReply(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	scrapID, _ := strconv.ParseInt(ps.ByName("id"), 10, 64)
-	var req struct {
-		UserID  int64  `json:"user_id"`
-		Content string `json:"content"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+	var in postInput
+	if !decodeBody(w, r, &in) {
 		return
 	}
-	rep, err := h.DB.CreateReply(r.Context(), scrapID, req.UserID, req.Content)
+	// A reply is just a scrap-shaped body aimed at the scrap in the URL.
+	rep, err := h.DB.CreateReply(r.Context(), pathID(ps), in.UserID, in.Content)
 	if err != nil {
 		writeErr(w, err)
 		return
@@ -162,8 +187,7 @@ func (h *Handler) CreateReply(w http.ResponseWriter, r *http.Request, ps httprou
 }
 
 func (h *Handler) ListReplies(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	scrapID, _ := strconv.ParseInt(ps.ByName("id"), 10, 64)
-	replies, err := h.DB.ListReplies(r.Context(), scrapID)
+	replies, err := h.DB.ListReplies(r.Context(), pathID(ps))
 	if err != nil {
 		writeErr(w, err)
 		return

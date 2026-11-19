@@ -11,15 +11,23 @@ import (
 	_ "github.com/lib/pq"
 )
 
+const (
+	defaultScrapLimit = 50
+	maxScrapLimit     = 100
+)
+
 // DB wraps the sql.DB connection with retry-on-startup.
 type DB struct {
 	*sql.DB
 }
 
 func NewDB(url string) (*DB, error) {
-	var db *sql.DB
-	var err error
-	for i := 0; i < 30; i++ {
+	var (
+		db  *sql.DB
+		err error
+	)
+	// The database is probably just busy booting, so we knock politely 30 times.
+	for range 30 {
 		db, err = sql.Open("postgres", url)
 		if err == nil {
 			err = db.Ping()
@@ -39,7 +47,9 @@ func NewDB(url string) (*DB, error) {
 	return &DB{db}, nil
 }
 
+// migrate is additive only: IF NOT EXISTS everywhere, and no DROPs allowed.
 func migrate(db *sql.DB) error {
+	// SQL is just strings with commitment issues, so we keep it all in one place.
 	schema := `
 CREATE TABLE IF NOT EXISTS users (
 	id SERIAL PRIMARY KEY,
@@ -96,6 +106,29 @@ type Reply struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// ---- helpers ----
+
+// clampLimit keeps list sizes sane, so nobody scraps the entire internet at once.
+func clampLimit(limit int) int {
+	if limit <= 0 || limit > maxScrapLimit {
+		return defaultScrapLimit
+	}
+	return limit
+}
+
+// scanScraps appends every row onto out. Pass nil for a nil-when-empty result,
+// or []Scrap{} when the caller wants JSON to say [] instead of null.
+func scanScraps(rows *sql.Rows, out []Scrap) ([]Scrap, error) {
+	for rows.Next() {
+		var s Scrap
+		if err := rows.Scan(&s.ID, &s.UserID, &s.Author, &s.Content, &s.CreatedAt, &s.ReplyCount); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
 // ---- queries ----
 
 func (d *DB) CreateUser(ctx context.Context, name, email, avatar string) (*User, error) {
@@ -120,6 +153,7 @@ func (d *DB) ListUsers(ctx context.Context) ([]User, error) {
 		return nil, err
 	}
 	defer rows.Close()
+	// Newest members first, like a very polite queue.
 	var out []User
 	for rows.Next() {
 		var u User
@@ -130,7 +164,6 @@ func (d *DB) ListUsers(ctx context.Context) ([]User, error) {
 	}
 	return out, rows.Err()
 }
-// note: midpoint of this file
 
 func (d *DB) GetUser(ctx context.Context, id int64) (*User, error) {
 	u := &User{}
@@ -157,6 +190,7 @@ func (d *DB) CreateScrap(ctx context.Context, userID int64, content string) (*Sc
 	if err != nil {
 		return nil, err
 	}
+	// Author name is fetched separately, since RETURNING cannot JOIN.
 	if err := d.QueryRowContext(ctx, `SELECT name FROM users WHERE id=$1`, userID).Scan(&s.Author); err != nil {
 		return nil, err
 	}
@@ -164,52 +198,30 @@ func (d *DB) CreateScrap(ctx context.Context, userID int64, content string) (*Sc
 }
 
 func (d *DB) ListScraps(ctx context.Context, limit int) ([]Scrap, error) {
-	if limit <= 0 || limit > 100 {
-		limit = 50
-	}
 	rows, err := d.QueryContext(ctx, `
 		SELECT s.id, s.user_id, u.name, s.content, s.created_at,
 		       (SELECT count(*) FROM replies r WHERE r.scrap_id = s.id)
 		FROM scraps s JOIN users u ON u.id = s.user_id
-		ORDER BY s.created_at DESC LIMIT $1`, limit)
+		ORDER BY s.created_at DESC LIMIT $1`, clampLimit(limit))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []Scrap
-	for rows.Next() {
-		var s Scrap
-		if err := rows.Scan(&s.ID, &s.UserID, &s.Author, &s.Content, &s.CreatedAt, &s.ReplyCount); err != nil {
-			return nil, err
-		}
-		out = append(out, s)
-	}
-	return out, rows.Err()
+	return scanScraps(rows, nil)
 }
 
 func (d *DB) ListUserScraps(ctx context.Context, userID int64, limit int) ([]Scrap, error) {
-	if limit <= 0 || limit > 100 {
-		limit = 50
-	}
 	rows, err := d.QueryContext(ctx, `
 		SELECT s.id, s.user_id, u.name, s.content, s.created_at,
 		       (SELECT count(*) FROM replies r WHERE r.scrap_id = s.id)
 		FROM scraps s JOIN users u ON u.id = s.user_id
 		WHERE s.user_id = $1
-		ORDER BY s.created_at DESC LIMIT $2`, userID, limit)
+		ORDER BY s.created_at DESC LIMIT $2`, userID, clampLimit(limit))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := []Scrap{}
-	for rows.Next() {
-		var s Scrap
-		if err := rows.Scan(&s.ID, &s.UserID, &s.Author, &s.Content, &s.CreatedAt, &s.ReplyCount); err != nil {
-			return nil, err
-		}
-		out = append(out, s)
-	}
-	return out, rows.Err()
+	return scanScraps(rows, []Scrap{})
 }
 
 func (d *DB) GetScrap(ctx context.Context, id int64) (*Scrap, error) {
@@ -231,6 +243,7 @@ func (d *DB) CreateReply(ctx context.Context, scrapID, userID int64, content str
 	if content == "" || scrapID <= 0 || userID <= 0 {
 		return nil, ErrValidation
 	}
+	// This existence check is the bouncer for scrap IDs.
 	var exists bool
 	if err := d.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM scraps WHERE id=$1)`, scrapID).Scan(&exists); err != nil {
 		return nil, err
@@ -262,6 +275,7 @@ func (d *DB) ListReplies(ctx context.Context, scrapID int64) ([]Reply, error) {
 		return nil, err
 	}
 	defer rows.Close()
+	// Replies wait their turn, oldest first.
 	var out []Reply
 	for rows.Next() {
 		var r Reply

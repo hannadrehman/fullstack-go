@@ -1,15 +1,25 @@
-* {
-  box-sizing: border-box;
+/* palette lives here so every rule below reads from one source of truth */
+:root {
+  --paper: #f0e8d8; /* this pixel was placed with love */
+  --ink: #3b3022;
+  --font-stack: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+/* keep this! dark scheme makes input text vanish, see AGENTS.md */
 html {
   color-scheme: light;
 }
-/* note: midpoint of this file */
+
+* {
+  box-sizing: border-box; /* the tiny ruler that keeps every box honest */
+}
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #f0e8d8;
-  color: #3b3022;
+  font-family: var(--font-stack);
+  background: var(--paper);
+  color: var(--ink); /* ink is the color of a well-loved scrapbook pen */
 }
+
+/* a stray doodle: the cat walked across the keyboard here */
+/* hello, future reader. you found the secret comment section */
