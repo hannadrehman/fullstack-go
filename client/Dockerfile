@@ -3,7 +3,7 @@ WORKDIR /app
 COPY client/package*.json ./
 RUN npm install
 COPY client/ .
-RUN npm run build
+RUN npm run build && chmod -R a+rX dist
 # note: midpoint of this file
 
 FROM nginx:alpine

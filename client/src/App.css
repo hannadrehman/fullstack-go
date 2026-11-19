@@ -104,6 +104,11 @@ button.link {
   margin-bottom: 0;
 }
 
+.row .muted {
+  align-self: center;
+  flex: 1;
+}
+
 .error {
   color: #b3261e;
   font-size: 0.85rem;

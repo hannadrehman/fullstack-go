@@ -106,16 +106,33 @@ func (h *Handler) ListUserScraps(w http.ResponseWriter, r *http.Request, ps http
 	writeJSON(w, http.StatusOK, scraps)
 }
 
+func (h *Handler) ListUserScrapbook(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	id, _ := strconv.ParseInt(ps.ByName("id"), 10, 64)
+	if _, err := h.DB.GetUser(r.Context(), id); err != nil {
+		writeErr(w, err)
+		return
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	scraps, err := h.DB.ListScrapbook(r.Context(), id, limit)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, scraps)
+}
+
+// CreateScrap accepts an optional to_user_id; omit it (or null) for a feed post.
 func (h *Handler) CreateScrap(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var req struct {
-		UserID  int64  `json:"user_id"`
-		Content string `json:"content"`
+		UserID   int64  `json:"user_id"`
+		ToUserID *int64 `json:"to_user_id"`
+		Content  string `json:"content"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
 		return
 	}
-	s, err := h.DB.CreateScrap(r.Context(), req.UserID, req.Content)
+	s, err := h.DB.CreateScrap(r.Context(), req.UserID, req.ToUserID, req.Content)
 	if err != nil {
 		writeErr(w, err)
 		return
