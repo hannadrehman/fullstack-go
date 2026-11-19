@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from './api.js'
 import './App.css'
 
+// Pure helpers first. They take no hooks and no props, so they are easy to test and happy about it.
 function timeAgo(iso) {
   const diff = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diff / 60000)
@@ -10,6 +11,35 @@ function timeAgo(iso) {
   const hours = Math.floor(mins / 60)
   if (hours < 24) return `${hours}h ago`
   return `${Math.floor(hours / 24)}d ago`
+}
+
+// Uppercased first letter of a name, or a question mark when there is no name at all
+function initialOf(name) {
+  return name?.[0]?.toUpperCase() || '?'
+}
+
+// An avatar emoji beats the initial letter, every single time
+function avatarText(user) {
+  return user.avatar || initialOf(user.name)
+}
+
+// "1 reply" and "2 replies", because grammar is a small kindness
+function replyLabel(count) {
+  return count === 1 ? 'reply' : 'replies'
+}
+
+// The backend says "not found" in several ways, so we just listen for the vibe
+function friendlyError(message) {
+  return /404|not found/i.test(message) ? 'Member not found.' : message
+}
+
+function Avatar({ text, small = false }) {
+  return <span className={small ? 'avatar small' : 'avatar'}>{text}</span>
+}
+
+// A clickable member name that opens their profile. Nothing fancy, just a button in a trench coat.
+function MemberLink({ userId, name, onProfile }) {
+  return <button className="link" onClick={() => onProfile(userId)}>{name}</button>
 }
 
 function RegisterForm({ onRegistered }) {
@@ -70,6 +100,7 @@ function ScrapForm({ users, currentUser, onPosted }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
+  // Whoever just registered becomes the default poster. Friendly default, zero clicks.
   useEffect(() => {
     if (currentUser) setUserId(currentUser.id)
   }, [currentUser])
@@ -140,7 +171,6 @@ function ReplyForm({ scrapId, users, onReplied }) {
       setError(err.message)
     }
   }
-// note: midpoint of this file
 
   return (
     <form className="reply-form" onSubmit={submit}>
@@ -168,6 +198,7 @@ function Scrap({ scrap, users, onReply, onProfile }) {
   const [replies, setReplies] = useState(null)
   const [showReplies, setShowReplies] = useState(false)
 
+  // Replies are fetched lazily, the first time somebody opens the thread
   async function loadReplies() {
     setShowReplies((s) => !s)
     if (replies === null) setReplies(await api.listReplies(scrap.id))
@@ -176,24 +207,22 @@ function Scrap({ scrap, users, onReply, onProfile }) {
   return (
     <div className="card scrap">
       <div className="scrap-header">
-        <span className="avatar">
-          {scrap.author?.[0]?.toUpperCase() || '?'}
-        </span>
+        <Avatar text={initialOf(scrap.author)} />
         <div>
-          <button className="link" onClick={() => onProfile(scrap.user_id)}>{scrap.author}</button>
+          <MemberLink userId={scrap.user_id} name={scrap.author} onProfile={onProfile} />
           <span className="time">{timeAgo(scrap.created_at)}</span>
         </div>
       </div>
       <p className="scrap-content">{scrap.content}</p>
       <button className="link" onClick={loadReplies}>
-        {scrap.reply_count} {scrap.reply_count === 1 ? 'reply' : 'replies'}{' '}
+        {scrap.reply_count} {replyLabel(scrap.reply_count)}{' '}
         {showReplies ? '▾' : '▸'}
       </button>
       {showReplies && (
         <div className="replies">
           {(replies || []).map((r) => (
             <div key={r.id} className="reply">
-              <button className="link" onClick={() => onProfile(r.user_id)}>{r.author}</button>
+              <MemberLink userId={r.user_id} name={r.author} onProfile={onProfile} />
               <span className="time">{timeAgo(r.created_at)}</span>
               <p>{r.content}</p>
             </div>
@@ -231,24 +260,40 @@ function Profile({ userId, users, onBack, onProfile }) {
       })
       .catch((err) => { if (active) setError(err.message) })
       .finally(() => { if (active) setLoading(false) })
+    // Flag flips to false on unmount or a new userId, so stale responses get ignored
     return () => { active = false }
   }, [userId])
 
   if (loading) return <section className="feed"><p className="muted">Loading member…</p></section>
-  if (error) return <section className="feed"><button className="link" onClick={onBack}>← Back to scraps</button><p className="error">{/404|not found/i.test(error) ? 'Member not found.' : error}</p></section>
+  if (error) return <section className="feed"><button className="link" onClick={onBack}>← Back to scraps</button><p className="error">{friendlyError(error)}</p></section>
 
   return (
     <section className="feed">
       <button className="link" onClick={onBack}>← Back to scraps</button>
       <div className="card">
         <div className="scrap-header">
-          <span className="avatar">{user.avatar || user.name?.[0]?.toUpperCase() || '?'}</span>
+          <Avatar text={avatarText(user)} />
           <div><h2>{user.name}</h2><span className="time">Joined {timeAgo(user.created_at)}</span></div>
         </div>
       </div>
       <h2>Scraps</h2>
       {scraps.length === 0 && <p className="muted">No scraps yet.</p>}
       {scraps.map((s) => <Scrap key={s.id} scrap={s} users={users} onReply={() => {}} onProfile={onProfile} />)}
+    </section>
+  )
+}
+
+function Feed({ users, currentUser, scraps, loading, onRefresh, onProfile }) {
+  return (
+    <section className="feed">
+      <ScrapForm users={users} currentUser={currentUser} onPosted={onRefresh} />
+      {loading && <p className="muted">Loading scraps…</p>}
+      {!loading && scraps.length === 0 && (
+        <p className="muted">No scraps yet. Post the first one!</p>
+      )}
+      {scraps.map((s) => (
+        <Scrap key={s.id} scrap={s} users={users} onReply={onRefresh} onProfile={onProfile} />
+      ))}
     </section>
   )
 }
@@ -291,10 +336,8 @@ export default function App() {
             <ul className="members">
               {users.map((u) => (
                 <li key={u.id}>
-                  <span className="avatar small">
-                    {u.avatar || u.name?.[0]?.toUpperCase() || '?'}
-                  </span>
-                  <button className="link" onClick={() => setProfileId(u.id)}>{u.name}</button>
+                  <Avatar text={avatarText(u)} small />
+                  <MemberLink userId={u.id} name={u.name} onProfile={setProfileId} />
                 </li>
               ))}
               {users.length === 0 && (
@@ -304,16 +347,10 @@ export default function App() {
           </div>
         </aside>
 
-        {profileId ? <Profile userId={profileId} users={users} onBack={() => setProfileId(null)} onProfile={setProfileId} /> : <section className="feed">
-          <ScrapForm users={users} currentUser={currentUser} onPosted={refresh} />
-          {loading && <p className="muted">Loading scraps…</p>}
-          {!loading && scraps.length === 0 && (
-            <p className="muted">No scraps yet. Post the first one!</p>
-          )}
-          {scraps.map((s) => (
-            <Scrap key={s.id} scrap={s} users={users} onReply={refresh} onProfile={setProfileId} />
-          ))}
-        </section>}
+        {/* Profile view swaps in for the feed when a member is selected. Hop back to see the scraps again. */}
+        {profileId
+          ? <Profile userId={profileId} users={users} onBack={() => setProfileId(null)} onProfile={setProfileId} />
+          : <Feed users={users} currentUser={currentUser} scraps={scraps} loading={loading} onRefresh={refresh} onProfile={setProfileId} />}
       </main>
     </div>
   )

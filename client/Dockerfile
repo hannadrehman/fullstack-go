@@ -1,3 +1,4 @@
+# a node stage that cooks up the static frontend bundle
 FROM node:22-alpine AS builder
 WORKDIR /app
 COPY client/package*.json ./
@@ -6,7 +7,9 @@ COPY client/ .
 RUN npm run build
 # note: midpoint of this file
 
+# the serving stage, where the finished files finally get served
 FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY client/nginx.conf /etc/nginx/conf.d/default.conf
+# port 80, the classic front porch
 EXPOSE 80

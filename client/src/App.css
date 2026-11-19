@@ -1,14 +1,34 @@
+/* scrapbook palette, kept in one place */
+:root {
+  --paper: #f0e8d8;
+  --ink: #3b3022;
+  --card: #fffdf5;
+  --line: #d8c9a8;
+  --line-strong: #c9b894;
+  --accent: #d94f2b;
+  --accent-hover: #c24322;
+  --gold: #e8b04a;
+  --link: #a05a1a;
+  --error: #b3261e;
+  --muted: #8a7a5f;
+  --radius: 6px;
+  --radius-card: 10px;
+}
+
+/* base reset: borders and padding stay inside their boxes */
 * {
   box-sizing: border-box;
 }
 
+/* page basics */
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #f0e8d8;
-  color: #3b3022;
+  background: var(--paper);
+  color: var(--ink);
 }
 
+/* layout */
 .app {
   max-width: 960px;
   margin: 0 auto;
@@ -38,10 +58,11 @@ main {
   }
 }
 
+/* cards: the paper squares you pin things to */
 .card {
-  background: #fffdf5;
-  border: 1px solid #d8c9a8;
-  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
   padding: 16px;
   margin-bottom: 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
@@ -52,13 +73,14 @@ main {
   font-size: 1.1rem;
 }
 
+/* form controls */
 input,
 textarea,
 select {
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid #c9b894;
-  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
   font: inherit;
   background: #fff;
   margin-bottom: 8px;
@@ -68,18 +90,20 @@ textarea {
   resize: vertical;
 }
 
+/* buttons */
 button {
-  background: #d94f2b;
+  background: var(--accent);
   color: #fff;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius);
   padding: 8px 14px;
   font: inherit;
   cursor: pointer;
 }
 
+/* stamp it harder on hover */
 button:hover {
-  background: #c24322;
+  background: var(--accent-hover);
 }
 
 button:disabled {
@@ -87,13 +111,13 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* text-style button, declared after the solid one so it wins */
 button.link {
   background: none;
-  color: #a05a1a;
+  color: var(--link);
   padding: 4px 0;
   font-size: 0.85rem;
 }
-/* note: midpoint of this file */
 
 .row {
   display: flex;
@@ -104,20 +128,23 @@ button.link {
   margin-bottom: 0;
 }
 
+/* status text */
 .error {
-  color: #b3261e;
+  color: var(--error);
   font-size: 0.85rem;
   margin: 4px 0;
 }
 
 .muted {
-  color: #8a7a5f;
+  color: var(--muted);
 }
 
+/* feed: tall enough that the page does not jump around */
 .feed {
   min-height: 400px;
 }
 
+/* scrap header: avatar and author on one line, glue dries in about a minute */
 .scrap-header {
   display: flex;
   align-items: center;
@@ -128,7 +155,7 @@ button.link {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: #e8b04a;
+  background: var(--gold);
   color: #fff;
   display: inline-flex;
   align-items: center;
@@ -146,17 +173,19 @@ button.link {
 .time {
   display: block;
   font-size: 0.75rem;
-  color: #8a7a5f;
+  color: var(--muted);
 }
 
+/* scrap body */
 .scrap-content {
   margin: 10px 0;
   white-space: pre-wrap;
 }
 
+/* replies: dashed tape line, a little like a note stuck underneath */
 .replies {
   margin-top: 10px;
-  border-top: 1px dashed #d8c9a8;
+  border-top: 1px dashed var(--line);
   padding-top: 10px;
 }
 
@@ -174,6 +203,7 @@ button.link {
   margin-top: 8px;
 }
 
+/* members list: friends lined up like stickers in an album */
 .members {
   list-style: none;
   padding: 0;
